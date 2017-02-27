@@ -2,7 +2,7 @@ from setuptools import setup
 
 setup(
       name = "delfick_logging"
-    , version = "0.2"
+    , version = "0.2.1"
     , py_modules = ['delfick_logging']
 
     , install_requires =
