@@ -5,8 +5,24 @@ import json
 import sys
 import os
 
+class SimpleFormatter(logging.Formatter):
+    def __init__(self, *args, **kwargs):
+        if "ignore_extra" in kwargs:
+            ignore_extra = kwargs.pop("ignore_extra")
+        else:
+            ignore_extra = False
+        super(SimpleFormatter, self).__init__(*args, **kwargs)
+        self.ignore_extra = ignore_extra
+
+    def format(self, record):
+        if self.ignore_extra:
+            record.message = record.getMessage()
+            return self.formatMessage(record)
+        else:
+            return super(SimpleFormatter, self).format(record)
+
 class SyslogHandler(logging.handlers.SysLogHandler):
-    def format(s, record):
+    def format(self, record):
         oldGetMessage = record.getMessage
 
         def newGetMessage():
@@ -30,9 +46,15 @@ class SyslogHandler(logging.handlers.SysLogHandler):
                 if dc.get(attr):
                     base[attr] = dc[attr]
 
+            if dc.get("exc_info"):
+                base["traceback"] = self.formatter.formatException(dc["exc_info"])
+
+            if dc.get("stack_info"):
+                base["stack"] = self.formatter.formatStack(dc["stack_info"])
+
             return f(base)
         record.getMessage = newGetMessage
-        return super(SyslogHandler, s).format(record)
+        return super(SyslogHandler, self).format(record)
 
 class RainbowHandler(RainbowLoggingHandler):
     def format(s, record):
@@ -131,15 +153,15 @@ def setup_logging(log=None, level=logging.INFO, syslog="", syslog_address="", on
         base_format = "%(message)s"
 
     if syslog:
-        handler.setFormatter(logging.Formatter("{0}[{1}]: {2}".format(syslog, os.getpid(), base_format)))
+        handler.setFormatter(SimpleFormatter("{0}[{1}]: {2}".format(syslog, os.getpid(), base_format), ignore_extra=True))
     else:
         handler._column_color['%(asctime)s'] = ('cyan', None, False)
         handler._column_color['%(levelname)-7s'] = ('green', None, False)
         handler._column_color['%(message)s'][logging.INFO] = ('blue', None, False)
         if only_message:
-            handler.setFormatter(logging.Formatter(base_format))
+            handler.setFormatter(SimpleFormatter(base_format))
         else:
-            handler.setFormatter(logging.Formatter("{0} {1}".format("%(asctime)s %(levelname)-7s", base_format)))
+            handler.setFormatter(SimpleFormatter("{0} {1}".format("%(asctime)s %(levelname)-7s", base_format)))
 
     log.addHandler(handler)
     log.setLevel(level)
