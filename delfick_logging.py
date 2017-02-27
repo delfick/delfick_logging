@@ -1,6 +1,8 @@
 from rainbow_logging_handler import RainbowLoggingHandler
 import logging.handlers
+import traceback
 import logging
+import inspect
 import json
 import sys
 import os
@@ -27,6 +29,8 @@ class SyslogHandler(logging.handlers.SysLogHandler):
 
         def newGetMessage():
             def f(v):
+                if inspect.istraceback(v):
+                    return ' |:| '.join(traceback.format_tb(v))
                 if isinstance(v, dict):
                     return json.dumps(v, default=f, sort_keys=True)
                 elif hasattr(v, "as_dict"):
