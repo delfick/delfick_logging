@@ -107,6 +107,10 @@ class LogContext(object):
     def using(self, **kwargs):
         return LogContext(self.context, kwargs)
 
+    def unsafe_add_context(self, key, value):
+        self.context[key] = value
+        return self
+
 lc = LogContext()
 
 def setup_logging(log=None, level=logging.INFO, syslog="", syslog_address="", only_message=False, logging_handler_file=sys.stderr):
