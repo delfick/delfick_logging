@@ -13,7 +13,11 @@ class SimpleFormatter(logging.Formatter):
             ignore_extra = kwargs.pop("ignore_extra")
         else:
             ignore_extra = False
-        super(SimpleFormatter, self).__init__(*args, **kwargs)
+
+        if sys.version.startswith("2.6"):
+            logging.Formatter.__init__(self, *args, **kwargs)
+        else:
+            super(SimpleFormatter, self).__init__(*args, **kwargs)
         self.ignore_extra = ignore_extra
 
     def format(self, record):
@@ -21,7 +25,10 @@ class SimpleFormatter(logging.Formatter):
             record.message = record.getMessage()
             return self.formatMessage(record)
         else:
-            return super(SimpleFormatter, self).format(record)
+            if sys.version.startswith("2.6"):
+                return logging.Formatter.format(self, record)
+            else:
+                return super(SimpleFormatter, self).format(record)
 
 class SyslogHandler(logging.handlers.SysLogHandler):
     def format(self, record):
