@@ -89,13 +89,25 @@ log
 level
     The level we set the logging to. Defaults to logging.INFO
 
-syslog
-    The syslog program name to use, this also turns on syslog logging instead
-    of console logging. Defaults to not on.
+program
+    The program name to use when not logging to the console.
 
 syslog_address
-    The address to send syslog logs to. If this is a falsey value, then the
-    default is used.
+tcp_address
+udp_address
+    If none of these is specified, then we log to the console.
+
+    Otherwise we use the address to converse with a remote server.
+
+    tcp_address and udp_address Must be of the form "{host}:{port}".
+    i.e. "localhost:9001"
+
+    syslog_address may either be a filename or of the form "{host}:{port}"
+
+    Only one will be used.
+
+    If syslog is specified that is used, otherwise if udp is specified that is used,
+    otherwise tcp.
 
 only_message
     Whether to only print out the message when going to the console. Defaults to

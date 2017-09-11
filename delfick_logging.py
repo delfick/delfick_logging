@@ -1,4 +1,6 @@
 from rainbow_logging_handler import RainbowLoggingHandler
+from datetime import datetime
+from functools import partial
 import logging.handlers
 import traceback
 import logging
@@ -6,6 +8,43 @@ import inspect
 import json
 import sys
 import os
+
+def make_message(instance, record, oldGetMessage, program="", provide_timestamp=False):
+    def f(v):
+        if inspect.istraceback(v):
+            return ' |:| '.join(traceback.format_tb(v))
+        if isinstance(v, dict):
+            return json.dumps(v, default=f, sort_keys=True)
+        elif hasattr(v, "as_dict"):
+            return json.dumps(v.as_dict(), default=f, sort_keys=True)
+        elif isinstance(v, str):
+            return v
+        else:
+            return repr(v)
+
+    if isinstance(record.msg, dict):
+        base = record.msg
+    else:
+        base = {"msg": oldGetMessage()}
+
+    if program:
+        base["program"] = program
+
+    dc = record.__dict__
+    for attr in ("name", "levelname"):
+        if dc.get(attr):
+            base[attr] = dc[attr]
+
+    if provide_timestamp:
+        base["@timestamp"] = datetime.utcnow().isoformat()
+
+    if dc.get("exc_info"):
+        base["traceback"] = instance.formatter.formatException(dc["exc_info"])
+
+    if dc.get("stack_info"):
+        base["stack"] = instance.formatter.formatStack(dc["stack_info"])
+
+    return f(base)
 
 class SimpleFormatter(logging.Formatter):
     def __init__(self, *args, **kwargs):
@@ -32,40 +71,26 @@ class SimpleFormatter(logging.Formatter):
 
 class SyslogHandler(logging.handlers.SysLogHandler):
     def format(self, record):
-        oldGetMessage = record.getMessage
-
-        def newGetMessage():
-            def f(v):
-                if inspect.istraceback(v):
-                    return ' |:| '.join(traceback.format_tb(v))
-                if isinstance(v, dict):
-                    return json.dumps(v, default=f, sort_keys=True)
-                elif hasattr(v, "as_dict"):
-                    return json.dumps(v.as_dict(), default=f, sort_keys=True)
-                elif isinstance(v, str):
-                    return v
-                else:
-                    return repr(v)
-
-            if isinstance(record.msg, dict):
-                base = record.msg
-            else:
-                base = {"msg": oldGetMessage()}
-
-            dc = record.__dict__
-            for attr in ("name", "levelname"):
-                if dc.get(attr):
-                    base[attr] = dc[attr]
-
-            if dc.get("exc_info"):
-                base["traceback"] = self.formatter.formatException(dc["exc_info"])
-
-            if dc.get("stack_info"):
-                base["stack"] = self.formatter.formatStack(dc["stack_info"])
-
-            return f(base)
-        record.getMessage = newGetMessage
+        record.getMessage = partial(make_message, self, record, record.getMessage)
         return super(SyslogHandler, self).format(record)
+
+class JsonOverUDPHandler(logging.handlers.DatagramHandler):
+    def __init__(self, program, host, port):
+        self.program = program
+        super(JsonOverUDPHandler, self).__init__(host, port)
+
+    def makePickle(self, record):
+        record.getMessage = partial(make_message, self, record, record.getMessage, program=self.program, provide_timestamp=True)
+        return "{0}\n".format(super(JsonOverUDPHandler, self).format(record)).encode()
+
+class JsonOverTCPHandler(logging.handlers.SocketHandler):
+    def __init__(self, program, host, port):
+        self.program = program
+        super(JsonOverTCPHandler, self).__init__(host, port)
+
+    def makePickle(self, record):
+        record.getMessage = partial(make_message, self, record, record.getMessage, program=self.program, provide_timestamp=True)
+        return "{0}\n".format(super(JsonOverTCPHandler, self).format(record)).encode()
 
 class RainbowHandler(RainbowLoggingHandler):
     def format(s, record):
@@ -120,7 +145,10 @@ class LogContext(object):
 
 lc = LogContext()
 
-def setup_logging(log=None, level=logging.INFO, syslog="", syslog_address="", only_message=False, logging_handler_file=sys.stderr):
+def setup_logging(log=None, level=logging.INFO
+    , program="", syslog_address="", tcp_address="", udp_address=""
+    , only_message=False, logging_handler_file=sys.stderr
+    ):
     """
     Setup the logging handlers
 
@@ -134,13 +162,25 @@ def setup_logging(log=None, level=logging.INFO, syslog="", syslog_address="", on
     level
         The level we set the logging to
 
-    syslog
-        The syslog program name to use, this also turns on syslog logging instead
-        of console logging.
+    program
+        The program to give to the logs.
+
+        If syslog is specified, then we give syslog this as the program.
+
+        If tcp or udp address is specified, then we create a field in the json
+        called program with this value.
 
     syslog_address
-        The address to send syslog logs to. If this is a falsey value, then the
-        default is used.
+    tcp_address
+    udp_address
+        If none of these is specified, then we log to the console.
+
+        Otherwise we use the address to converse with a remote server.
+
+        Only one will be used.
+
+        If syslog is specified that is used, otherwise if udp is specified that is used,
+        otherwise tcp.
 
     only_message
         Whether to only print out the message when going to the console
@@ -150,11 +190,16 @@ def setup_logging(log=None, level=logging.INFO, syslog="", syslog_address="", on
     """
     log = log if log is not None else logging.getLogger(log)
 
-    if syslog:
-        opts = {}
-        if syslog_address:
-            opts = {"address": syslog_address}
-        handler = SyslogHandler(**opts)
+    if syslog_address:
+        address = syslog_address
+        if not syslog_address.startswith("/") and ":" in syslog_address:
+            split = address.split(":", 2)
+            address = (split[0], int(split[1]))
+        handler = SyslogHandler(address = address)
+    elif udp_address:
+        handler = JsonOverUDPHandler(program, udp_address.split(":")[0], int(udp_address.split(":")[1]))
+    elif tcp_address:
+        handler = JsonOverTCPHandler(program, tcp_address.split(":")[0], int(tcp_address.split(":")[1]))
     else:
         handler = RainbowHandler(logging_handler_file)
 
@@ -163,13 +208,15 @@ def setup_logging(log=None, level=logging.INFO, syslog="", syslog_address="", on
     if any(getattr(h, "delfick_logging", False) for h in log.handlers):
         return
 
-    base_format = "%(name)-15s %(message)s"
-    if only_message or syslog:
-        base_format = "%(message)s"
-
-    if syslog:
-        handler.setFormatter(SimpleFormatter("{0}[{1}]: {2}".format(syslog, os.getpid(), base_format), ignore_extra=True))
+    if syslog_address:
+        handler.setFormatter(SimpleFormatter("{0}[{1}]: %(message)s".format(program, os.getpid()), ignore_extra=True))
+    elif udp_address or tcp_address:
+        handler.setFormatter(SimpleFormatter("%(message)s"))
     else:
+        base_format = "%(name)-15s %(message)s"
+        if only_message:
+            base_format = "%(message)s"
+
         handler._column_color['%(asctime)s'] = ('cyan', None, False)
         handler._column_color['%(levelname)-7s'] = ('green', None, False)
         handler._column_color['%(message)s'][logging.INFO] = ('blue', None, False)
