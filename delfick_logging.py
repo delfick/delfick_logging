@@ -92,6 +92,10 @@ class JsonOverTCPHandler(logging.handlers.SocketHandler):
         record.getMessage = partial(make_message, self, record, record.getMessage, program=self.program, provide_timestamp=True)
         return "{0}\n".format(super(JsonOverTCPHandler, self).format(record)).encode()
 
+class JsonToConsoleHandler(logging.StreamHandler):
+    def format(self, record):
+        return make_message(self, record, record.getMessage, provide_timestamp=True)
+
 class RainbowHandler(RainbowLoggingHandler):
     def format(s, record):
         oldGetMessage = record.getMessage
@@ -147,7 +151,7 @@ lc = LogContext()
 
 def setup_logging(log=None, level=logging.INFO
     , program="", syslog_address="", tcp_address="", udp_address=""
-    , only_message=False, logging_handler_file=sys.stderr
+    , only_message=False, json_to_console=False, logging_handler_file=sys.stderr
     ):
     """
     Setup the logging handlers
@@ -182,6 +186,10 @@ def setup_logging(log=None, level=logging.INFO
         If syslog is specified that is used, otherwise if udp is specified that is used,
         otherwise tcp.
 
+    json_to_console
+        Defaults to False. When True and we haven't specified syslog/tcp/udp address
+        then write json lines to the console.
+
     only_message
         Whether to only print out the message when going to the console
 
@@ -201,7 +209,10 @@ def setup_logging(log=None, level=logging.INFO
     elif tcp_address:
         handler = JsonOverTCPHandler(program, tcp_address.split(":")[0], int(tcp_address.split(":")[1]))
     else:
-        handler = RainbowHandler(logging_handler_file)
+        if json_to_console:
+            handler = JsonToConsoleHandler(logging_handler_file)
+        else:
+            handler = RainbowHandler(logging_handler_file)
 
     # Protect against this being called multiple times
     handler.delfick_logging = True
@@ -210,7 +221,7 @@ def setup_logging(log=None, level=logging.INFO
 
     if syslog_address:
         handler.setFormatter(SimpleFormatter("{0}[{1}]: %(message)s".format(program, os.getpid()), ignore_extra=True))
-    elif udp_address or tcp_address:
+    elif udp_address or tcp_address or json_to_console:
         handler.setFormatter(SimpleFormatter("%(message)s"))
     else:
         base_format = "%(name)-15s %(message)s"
