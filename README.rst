@@ -144,7 +144,10 @@ There are currently two options: "light", which is default; and "dark".
 Changelog
 ---------
 
-0.3.1 - 25 Auguest 2018
+0.3.2 - 25 August 2018
+    * Made json_to_console option pay attention to program option
+
+0.3.1 - 25 August 2018
     * Added json_to_console option for making logs go to the console as json
       strings
 
