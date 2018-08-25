@@ -93,8 +93,12 @@ class JsonOverTCPHandler(logging.handlers.SocketHandler):
         return "{0}\n".format(super(JsonOverTCPHandler, self).format(record)).encode()
 
 class JsonToConsoleHandler(logging.StreamHandler):
+    def __init__(self, program, stream=None):
+        self.program = program
+        super(JsonToConsoleHandler, self).__init__(stream=stream)
+
     def format(self, record):
-        return make_message(self, record, record.getMessage, provide_timestamp=True)
+        return make_message(self, record, record.getMessage, program=self.program, provide_timestamp=True)
 
 class RainbowHandler(RainbowLoggingHandler):
     def format(s, record):
@@ -171,8 +175,8 @@ def setup_logging(log=None, level=logging.INFO
 
         If syslog is specified, then we give syslog this as the program.
 
-        If tcp or udp address is specified, then we create a field in the json
-        called program with this value.
+        If tcp_address, udp_address or json_to_console is specified, then we
+        create a field in the json called program with this value.
 
     syslog_address
     tcp_address
@@ -210,7 +214,7 @@ def setup_logging(log=None, level=logging.INFO
         handler = JsonOverTCPHandler(program, tcp_address.split(":")[0], int(tcp_address.split(":")[1]))
     else:
         if json_to_console:
-            handler = JsonToConsoleHandler(logging_handler_file)
+            handler = JsonToConsoleHandler(program, logging_handler_file)
         else:
             handler = RainbowHandler(logging_handler_file)
 

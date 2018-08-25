@@ -90,7 +90,12 @@ level
     The level we set the logging to. Defaults to logging.INFO
 
 program
-    The program name to use when not logging to the console.
+    The program to give to the logs.
+
+    If syslog is specified, then we give syslog this as the program.
+
+    If tcp_address, udp_address or json_to_console is specified, then we
+    create a field in the json called program with this value.
 
 syslog_address
 tcp_address
