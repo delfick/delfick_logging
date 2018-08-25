@@ -109,6 +109,10 @@ udp_address
     If syslog is specified that is used, otherwise if udp is specified that is used,
     otherwise tcp.
 
+json_to_console
+    Defaults to False. When True and we haven't specified syslog/tcp/udp address
+    then write json lines to the console.
+
 only_message
     Whether to only print out the message when going to the console. Defaults to
     False
@@ -131,3 +135,13 @@ level messages:
     setup_logging_theme(handler, colors="dark")
 
 There are currently two options: "light", which is default; and "dark".
+
+Changelog
+---------
+
+0.3.1 - 25 Auguest 2018
+    * Added json_to_console option for making logs go to the console as json
+      strings
+
+0.3
+    * No changelog was kept before this point
