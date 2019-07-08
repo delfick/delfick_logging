@@ -23,7 +23,7 @@ def make_message(instance, record, oldGetMessage, program="", provide_timestamp=
             return repr(v)
 
     if isinstance(record.msg, dict):
-        base = record.msg
+        base = dict(record.msg)
     else:
         base = {"msg": oldGetMessage()}
 

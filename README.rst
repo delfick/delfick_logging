@@ -144,6 +144,9 @@ There are currently two options: "light", which is default; and "dark".
 Changelog
 ---------
 
+0.3.3 - 8 July 2019
+    * Make sure that we don't modify the record we get when it's a dictionary
+
 0.3.2 - 25 August 2018
     * Made json_to_console option pay attention to program option
 
