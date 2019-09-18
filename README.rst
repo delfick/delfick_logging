@@ -4,6 +4,11 @@ Delfick Logging
 Some opinionated settings for python logging to allow for structured logging in
 your application.
 
+Deprecated
+----------
+
+This project has been deprecated in favour of https://github.com/delfick/delfick_project
+
 Getting Started
 ---------------
 
